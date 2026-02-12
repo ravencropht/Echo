@@ -2,6 +2,7 @@
 description.txt
 .chroma_db
 venv
-#sessions/*
+sessions/*
+character/*
 .env
 *.pyc
