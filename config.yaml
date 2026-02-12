@@ -1,0 +1,18 @@
+server:
+  host: "127.0.0.1"
+  port: 8000
+
+embedding:
+  model: "all-MiniLM-L6-v2"
+  chunk_size: 500
+  chunk_overlap: 50
+
+rag:
+  top_k: 3
+  min_similarity: 0.6
+
+paths:
+  profile: "character/profile.txt"
+  knowledge_dir: "character/"
+  sessions_dir: "sessions"
+  chroma_db: ".chroma_db"

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with {{ character_name }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        .message-user {
+            @apply bg-blue-600 text-white ml-auto max-w-[80%] rounded-2xl rounded-br-sm;
+        }
+        .message-assistant {
+            @apply bg-gray-200 text-gray-800 mr-auto max-w-[80%] rounded-2xl rounded-bl-sm;
+        }
+        .typing-indicator span {
+            @apply inline-block w-2 h-2 bg-gray-400 rounded-full animate-bounce;
+            animation-delay: calc(var(--i) * 0.1s);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-3xl mx-auto h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white shadow-sm p-4 flex items-center gap-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                {{ character_name[:1].upper() }}
+            </div>
+            <div>
+                <h1 class="text-xl font-semibold text-gray-800">{{ character_name }}</h1>
+                <p class="text-sm text-gray-500">Online</p>
+            </div>
+            <div class="ml-auto">
+                <button onclick="clearChat()" class="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100" title="New chat">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat messages -->
+        <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <!-- Messages will be inserted here -->
+            <div class="message-assistant px-4 py-3">
+                <p>Hello! I'm {{ character_name }}. How can I help you today?</p>
+            </div>
+        </div>
+
+        <!-- Sources info (hidden by default) -->
+        <div id="sources" class="hidden px-4 py-2 bg-yellow-50 border-t border-yellow-200 text-sm text-yellow-800">
+            <span class="font-medium">Sources:</span> <span id="sources-list"></span>
+        </div>
+
+        <!-- Typing indicator (hidden by default) -->
+        <div id="typing" class="hidden px-4 pb-2">
+            <div class="typing-indicator inline-flex gap-1">
+                <span style="--i: 0"></span>
+                <span style="--i: 1"></span>
+                <span style="--i: 2"></span>
+            </div>
+        </div>
+
+        <!-- Input form -->
+        <form id="chat-form" class="p-4 bg-white border-t">
+            <div class="flex gap-2">
+                <input
+                    type="text"
+                    id="message-input"
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Type a message..."
+                    autocomplete="off"
+                >
+                <button
+                    type="submit"
+                    class="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    id="send-button"
+                >
+                    Send
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let sessionId = null;
+        const messagesContainer = document.getElementById('messages');
+        const messageForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const typingIndicator = document.getElementById('typing');
+        const sourcesDiv = document.getElementById('sources');
+        const sourcesList = document.getElementById('sources-list');
+
+        // Scroll to bottom
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Add message to chat
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = role === 'user' ? 'message-user px-4 py-3' : 'message-assistant px-4 py-3';
+            messageDiv.innerHTML = `<p class="whitespace-pre-wrap">${escapeHtml(content)}</p>`;
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Show/hide typing indicator
+        function setTyping(show) {
+            typingIndicator.classList.toggle('hidden', !show);
+            if (show) scrollToBottom();
+        }
+
+        // Show sources
+        function showSources(sources) {
+            if (sources && sources.length > 0) {
+                sourcesList.textContent = sources.map(s => `${s.file} (${Math.round(s.relevance * 100)}%)`).join(', ');
+                sourcesDiv.classList.remove('hidden');
+            } else {
+                sourcesDiv.classList.add('hidden');
+            }
+        }
+
+        // Send message
+        async function sendMessage(message) {
+            setTyping(true);
+            sendButton.disabled = true;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: sessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to send message');
+                }
+
+                const data = await response.json();
+                sessionId = data.session_id;
+                localStorage.setItem('chat_session_id', sessionId);
+
+                addMessage('assistant', data.response);
+                showSources(data.sources);
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('assistant', 'Sorry, something went wrong. Please try again.');
+            } finally {
+                setTyping(false);
+                sendButton.disabled = false;
+            }
+        }
+
+        // Clear chat
+        function clearChat() {
+            sessionId = null;
+            localStorage.removeItem('chat_session_id');
+            messagesContainer.innerHTML = `
+                <div class="message-assistant px-4 py-3">
+                    <p>Hello! I'm {{ character_name|safe }}. How can I help you today?</p>
+                </div>
+            `;
+            sourcesDiv.classList.add('hidden');
+        }
+
+        // Load session from localStorage on page load
+        function loadSession() {
+            const savedSessionId = localStorage.getItem('chat_session_id');
+            if (savedSessionId) {
+                sessionId = savedSessionId;
+                // Load session history from server
+                fetch(`/api/sessions/${savedSessionId}`)
+                    .then(res => {
+                        if (res.ok) return res.json();
+                        throw new Error('Session not found');
+                    })
+                    .then(data => {
+                        // Clear welcome message and load history
+                        messagesContainer.innerHTML = '';
+                        data.messages.forEach(msg => {
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = msg.role === 'user' ? 'message-user px-4 py-3' : 'message-assistant px-4 py-3';
+                            messageDiv.innerHTML = `<p class="whitespace-pre-wrap">${escapeHtml(msg.content)}</p>`;
+                            messagesContainer.appendChild(messageDiv);
+                        });
+                        scrollToBottom();
+                    })
+                    .catch(err => {
+                        console.log('Could not load session:', err);
+                        localStorage.removeItem('chat_session_id');
+                        sessionId = null;
+                    });
+            }
+        }
+
+        // Form submit handler
+        messageForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessage('user', message);
+            messageInput.value = '';
+            await sendMessage(message);
+        });
+
+        // Focus input on load
+        messageInput.focus();
+
+        // Load previous session on page load
+        loadSession();
+    </script>
+</body>
+</html>

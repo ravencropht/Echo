@@ -1,0 +1,7 @@
+.claude/*
+description.txt
+.chroma_db
+venv
+#sessions/*
+.env
+*.pyc
