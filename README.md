@@ -79,9 +79,11 @@ Visit `http://localhost:8000` after starting.
 - Anthropic API key (for Claude LLM)
 - 2GB+ RAM (for embedding model)
 
-## Configuration
+## Documentation
 
-See [CONFIGURATION.md](CONFIGURATION.md) for detailed configuration options.
+- **[Configuration Guide](docs/configuration.md)** - Detailed configuration options for embeddings, RAG, and server settings
+- **[Deployment Guide](docs/deployment.md)** - Docker deployment and production setup
+- **[System Design](docs/design.md)** - Architecture, data models, and implementation details
 
 ### Environment Variables
 
