@@ -38,6 +38,41 @@ Visit `http://127.0.0.1:8000` to start chatting.
 
 **To exit the virtual environment**: Run `deactivate`
 
+## Docker
+
+Build and run with Docker:
+
+```bash
+# Build image
+docker build -t echo-app .
+
+# Run container (with persistent volumes for sessions and vector DB)
+docker run -d \
+  -p 8000:8000 \
+  -e LLM_API_KEY=sk-ant-xxxxx \
+  -e LLM_API_URL=https://api.anthropic.com \
+  -e LLM_MODEL=claude-3-haiku-20240307 \
+  -v $(pwd)/sessions:/app/sessions \
+  -v $(pwd)/character:/app/character \
+  -v $(pwd)/.chroma_db:/app/.chroma_db \
+  echo-app
+```
+
+**Environment Variables:**
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LLM_API_KEY` | Yes | - | Anthropic API key |
+| `LLM_API_URL` | No | `https://api.anthropic.com` | Anthropic API URL |
+| `LLM_MODEL` | No | `claude-3-haiku-20240307` | Model to use |
+
+**Volumes:**
+- `./sessions` - Chat history persistence
+- `./character` - Character profile and additional knowledge .txt files
+- `./.chroma_db` - Vector database for knowledge files
+
+Visit `http://localhost:8000` after starting.
+
 ## Requirements
 
 - Python 3.10+
@@ -96,7 +131,3 @@ Add additional knowledge files as `*.txt` in the project root. These will be aut
 | `GET` | `/api/sessions` | List sessions |
 | `DELETE` | `/api/sessions/{id}` | Delete session |
 | `POST` | `/api/knowledge/rebuild` | Rebuild vector index |
-
-## License
-
-MIT
